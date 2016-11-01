@@ -1,0 +1,248 @@
+// Macros for Wakil-Lab Optical Density Comparisons
+// As requested by Pam Maras, Maria Waselus, and Elyse Aurbach
+// Written by Megan Hagenauer (06.03.2015)
+
+// Overview: 
+// 1) Over the years we have found that the quantification of in situ hybridization images is not standardized.
+// 2) This lack of standardization can reflect differences in the type of question asked as well as simple differences in protocol.
+// 3) Problems arise when we quantify using one method and then discover that our results do not match previous resultsÉ which involved a different style of quantification.
+// 4) This code simplifies comparisons across laboratories by outputting results using several different styles of quantification.
+
+
+
+
+macro "Calibration for Scanner1 Images [3]"{
+
+//  Edited by Megan Hagenauer (06.30.2015) - originally written by Jim Beal (?), date unknown
+
+// This macro requires first opening an in situ hybridization image.  The particular image doesn't matter, it is simply a requirement of the calibration function.  After calibrating using that image, the calibration will be applied to all images that you open during this session of ImageJ usage because we have specified "global calibration".  
+
+run("Set Scale...", "distance=63 known=1 pixel=1 unit=mm global");
+run("Calibrate...", "function=Rodbard unit=[Optical Density] text1=[251.0 210.73 176.53 145.04 118.19 97.05 80.74 66.34 57.1 50.19 43.38 38.63 34.73 31.59 29.62 27.64 26.6 25.79 25.08 24.63 24.45 ] text2=[0.06 0.19 0.33 0.48 0.64 0.8 0.95 1.11 1.25 1.38 1.54 1.67 1.83 1.99 2.12 2.28 2.41 2.57 2.74 2.89 3.0 ] show global");
+
+}
+
+
+
+macro "Calibration for Scanner2 Images [4]"{
+
+//  Edited by Megan Hagenauer (06.30.2015) - originally written by Jim Beal (?), date unknown
+// This macro requires first opening an in situ hybridization image.  The particular image doesn't matter, it is simply a requirement of the calibration function.  After calibrating using that image, the calibration will be applied to all images that you open during this session of ImageJ usage because we have specified "global calibration".  
+
+run("Set Scale...", "distance=63 known=1 pixel=1 unit=mm global");
+run("Calibrate...", "function=Rodbard unit=[Optical Density] text1=[238.55 199.77 166.05 138.11 119.4 99.62 84.15 71.04 60.01 50.9 41.98 36.48 31.51 27.44 23.49 20.46 18.1 15.96 14.75 13.79 ] text2=[0.06 0.19 0.33 0.48 0.64 0.8 0.95 1.11 1.25 1.38 1.54 1.67 1.83 1.99 2.12 2.28 2.41 2.57 2.74 2.89 ] show global");
+
+}
+
+
+
+
+macro "Background Corrected Density35 [1]" {
+
+//  Originally Written by Paul Werten and Wayne Rasband (10.03.2005)
+//  Edited by Megan Hagenauer (06.30.2015)
+
+//  Original description: 
+//  This macro uses the points along the selection boundary to calculate the
+//  background of the selection, and then uses this value to calculate the
+//  background-corrected integrated density. Size and shape of the selection
+//  may be changed at any time during the measurements. To obtain meaningful
+//  results, background values should be smaller than the actual data values
+//  (i.e., the background should appear dark, while data should be light). It
+//  may therefore be necessary to invert the image before analyzing it. Also,
+//  for the macro to work, "Area" and "Mean" must first be selected in the 
+//  "Analyze / Set Measurements" menu option. To actually measure, make an 
+//  appropriate selection and use 1 to get the results.
+
+
+// Megan's commentary:
+
+// Requirements:
+// This macro will only work for in situ hybridization quantification after calibration.
+// Specifically, in our lab we use a grayscale Rodbard global calibration using equivalencies 
+// derived from measuring the signal intensity of a scanned image of a standardized gray scale.
+
+
+// Purpose and Notes:
+// This macro produces a "threshold" for what is considered to be real or useful signal measurements.
+// This threshold is determined by referencing a user-defined "background" - i.e. the user selects 
+// (draws a shape around) something that they consider to be *definitively not signal of interest*
+// e.g. the film (if you just want to know what is darker than filmÉ), white matter (if your transcript
+// isn't expressed in white matter), space between cells (if you can clearly delineate cells), etc.
+// The program then defines the threshold as the average signal (or "optical density") for this background region
+// plus several standard deviations. The number of standard deviations determines how "confident" you are
+// that what you will eventually measure is above background. Currently the number of standard deviations is set to 3.5. 
+// This is traditional in our laboratory, but for many purposes may be too strict, and can be easily changed in the code below.
+// It is also worth noting that many laboratories do not use a thresholding procedure at all or may simply take a background measurement
+// and then subtract the mean background signal value from their later measurements in the region of interest ("background subtraction").
+// Caution: If you notice floor effects in your data it may be due to this thresholding procedure.
+
+// The actual code:
+
+    requires('1.34h');
+     if (selectionType==-1)
+        exit("Selection required");
+
+    run("Set Measurements...", "area min mean standard display redirect=None decimal=4");
+    run("Measure");
+    mean=getResult('Mean',nResults-1);
+    stddev=getResult('StdDev',nResults-1);
+    background=stddev*3.5 + mean;
+	// You can change the # of standard deviations in the above code if you desire a less strict threshold.
+
+    if (isNaN(mean))
+        exit("StdDev and Mean must be be selected in Analyze>Set Measurements");
+    
+    setResult('BackgroundMean',nResults-1,mean);
+    setResult('BackgroundThreshold',nResults-1,background);
+    updateResults();	
+
+  //this code just adds some empty results categories so that we don't lose data when we switch over to measurement mode:
+    setResult('PercentAreaLabeled',nResults-1,0);
+    setResult('SignalBackgroundSubtracted',nResults-1,0);
+    setResult('IOD',nResults-1, 0);
+    setResult('IODBackgroundSubtracted',nResults-1, 0);
+    setResult('IODUsingPercentAreaLabeled', nResults-1, 0);
+    setResult('IODUsingPercentAreaLabeledBackgroundSubtracted', nResults-1, 0);
+    updateResults();
+
+    ImageFileName=getTitle();
+    setResult("Label", nResults-1, "Background_"+ ImageFileName);
+    updateResults();
+
+   print('The value of background: ', background);
+
+run("Select None");
+    setThreshold(999,background,'red');
+	// The original version of this code said "setThreshold(0, background, 'red')"  
+	// That version only works with earlier versions of ImageJ which had the calibration function arbitrarily cross the y-axis at 0.
+
+run("Threshold...");
+
+}
+
+
+
+macro "Measure W Threshold [2]"{
+
+// Written by Mean Hagenauer (06.30.2015)
+
+// Requirements:
+// This macro is intended for use after:
+//1) The image of an in situ hybridization image has been calibrated (see notes above).
+//2) A threshold for "significant labeling" has already been defined using the macro "Background Corrected Density35". 
+
+// Purpose and Notes:
+// This macro allows the user to easily measure the the signal from a selected area of tissue without the threshold and then with the threshold. 
+// The macro then calculates optical density using several different definitions (see descriptions and calculations below).  
+// The output shows up in the Results window. 
+// It's a silly little macro, but it saves 4 keystrokes...
+
+
+// The actual code:
+
+	Background=getResult('BackgroundMean', nResults-1);
+	BackgroundThreshold=getResult('BackgroundThreshold', nResults-1);
+	run("Set Measurements...", "area min mean standard limit display redirect=None decimal=4");
+	
+	setThreshold(999, 0,'red');
+	run("Measure");
+	setResult('BackgroundThreshold',nResults-1, BackgroundThreshold);
+	setResult('BackgroundMean',nResults-1,Background);
+    	ImageFileName=getTitle();
+    	setResult("Label", nResults-1, "Unthresholded_"+ ImageFileName);
+        updateResults();
+
+	setThreshold(999, BackgroundThreshold,'red');
+	run("Measure");
+	setResult('BackgroundThreshold',nResults-1, BackgroundThreshold);
+	setResult('BackgroundMean',nResults-1,Background); 
+   	setResult("Label", nResults-1, "Thresholded_"+ ImageFileName);
+        updateResults();
+
+
+// Calculating the percentage of the area for the selected region of interest that has signal that surpasses threshold ("Percent Area Labeled"):
+// Note: This is only necessary if your region of interest varies in size/shape each time you take a measurement. If so, this calculation is important because your thresholded measurement of area will reflect variation in the size/shape of your original selection in addition to the number of pixels with signal surpassing threshold.
+	
+	TotalArea=getResult('Area',nResults-2);
+	AreaAboveThreshold=getResult('Area',nResults-1);
+	PercentAreaLabeled=(AreaAboveThreshold/TotalArea)*100
+    	setResult('PercentAreaLabeled',nResults-1,PercentAreaLabeled);
+
+
+// Subtracting the average Background signal from the unthresholded average signal for the region of interest ("Unthresholded Signal: Background Subtracted"):
+// Note: This is most appropriate if you have variation in background due to known technical reasons. Before using this data it is important that you first double-check whether background differs between your experimental groups.
+
+	Signal=getResult('Mean', nResults-2);
+	SignalBackgroundSubtracted=(Signal-Background);
+    	setResult('SignalBackgroundSubtracted',nResults-2,SignalBackgroundSubtracted);
+
+
+// Multiplying the unthresholded average signal for the region of interest by the area of the region of interest ("Integrated Optical Density: Unthresholded"):
+// Note: If your region of interest varies in size/shape each time you take a measurement, this output will reflect that and is probably not a good indication of biological meaning unless you believe that the size/shape of your measurements are varying for reasons that are of anatomical interest (e.g. larger dentate gyrus), in which case it is important to report group-related differences in the initial total area sampled ("Area: Unthresholded") with your interpretation.
+
+	IODUnthresholded=TotalArea*Signal;
+    	setResult('IOD',nResults-2, IODUnthresholded);
+ 
+
+// Calculating integrated optical density on unthresholded data, but using signal that has undergone background subtraction ("Integrated Optical density: Unthresholded but with Background Subtraction"):
+// Note: This has the same disclaimers as "Integrated Optical Density: Unthresholded", but may be more appropriate if you have variation in background due to known technical reasons. Before using this data it is important that you first double-check whether background differs between your experimental groups.
+
+	IODUnthresholdedBackgroundSubtracted=TotalArea*SignalBackgroundSubtracted;
+    	setResult('IODBackgroundSubtracted',nResults-2, IODUnthresholdedBackgroundSubtracted);
+
+
+// Subtracting the average Background signal from the thresholded average signal for the region of interest ("Thresholded Signal: Background Subtracted"):
+// Note: This is most appropriate if you have variation in background due to known technical reasons. Before using this data it is important that you first double-check whether background differs between your experimental groups.
+
+	ThresholdedSignal=getResult('Mean', nResults-1);
+	ThresholdedSignalBackgroundSubtracted=(ThresholdedSignal-Background);
+   	setResult('SignalBackgroundSubtracted',nResults-1,ThresholdedSignalBackgroundSubtracted);
+
+
+// Multiplying the thresholded average signal for the region of interest by the area of the region of interest ("Integrated Optical Density: Thresholded"):
+// Note: If your region of interest varies in size/shape each time you take a measurement, this output will reflect that and is probably not a good indication of biological meaning unless you believe that the size/shape of your measurements are varying for reasons that are of anatomical interest (e.g. larger dentate gyrus), in which case it is important to report group-related differences in the initial total area sampled ("Area: Unthresholded") with your interpretation, as well as the percent of that area that surpassed signal threshold ("Percent Area Labeled"):
+
+	IODThresholded=AreaAboveThreshold*ThresholdedSignal;
+    	setResult('IOD',nResults-1, IODThresholded);
+
+
+
+// Calculating integrated optical density on thresholded data, but using signal that has undergone background subtraction ("Integrated Optical density: Thresholded with Background Subtraction"):
+// Note: This has the same disclaimers as "Integrated Optical Density: Thresholded", but may be more appropriate if you have variation in background due to known technical reasons. Before using this data it is important that you first double-check whether background differs between your experimental groups.
+
+	IODThresholdedBackgroundSubtracted=AreaAboveThreshold*ThresholdedSignalBackgroundSubtracted;
+    	setResult('IODBackgroundSubtracted',nResults-1, IODThresholdedBackgroundSubtracted);
+
+
+// Calculating integrated optical density on thresholded data, but using signal that has undergone background subtraction and taking into account the size of your original selected region of interest (""Integrated Optical density: Thresholded, Calculated with Percent of Area Labeled"). 
+// Note: This is probably the most appropriate output if :
+// 1) Your experimental question requires a thresholding procedure.
+// 2) Your region of interest varies in size/shape each time you take a measurement.
+// However, for the sake of interpretation it should ideally still be reported with its component parts (thresholded signal and percent of area labeled). 
+
+	IODUsingPercentAreaLabeled=(PercentAreaLabeled/100)*ThresholdedSignal;
+   	setResult('IODUsingPercentAreaLabeled', nResults-1, IODUsingPercentAreaLabeled);
+
+
+
+// Calculating integrated optical density on thresholded data, but using signal that has undergone background subtraction and taking into account the size of your original selected region of interest (""Integrated Optical density: Thresholded, Calculated with Percent of Area Labeled"). 
+// Note: This is probably the most appropriate output if :
+// 1) Your experimental question requires a thresholding procedure.
+// 2) Your region of interest varies in size/shape each time you take a measurement.
+// 3) You have variation in background due to known technical reasons.
+// However, for the sake of interpretation it should ideally still be reported with its component parts (thresholded signal and percent of area labeled). 
+
+	IODUsingPercentAreaLabeledBackgroundSubtracted=(PercentAreaLabeled/100)*ThresholdedSignalBackgroundSubtracted;
+    	setResult('IODUsingPercentAreaLabeledBackgroundSubtracted', nResults-1, IODUsingPercentAreaLabeledBackgroundSubtracted);
+
+updateResults();
+String.copyResults();
+resetThreshold();
+run("Select None");
+
+}
+
+
+
+
